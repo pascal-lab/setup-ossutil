@@ -1,0 +1,70 @@
+name: Setup Aliyun OSSUtil
+description: Setup Aliyun ossutil on Linux x64 runners
+branding:
+  icon: upload-cloud
+  color: orange
+
+inputs:
+  endpoint:
+    description: OSS endpoint, for example oss-cn-hangzhou.aliyuncs.com
+    required: true
+  access-key-id:
+    description: Aliyun AccessKey ID
+    required: true
+  access-key-secret:
+    description: Aliyun AccessKey Secret
+    required: true
+  sts-token:
+    description: Optional STS token
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Setup ossutil
+      shell: bash
+      env:
+        OSSUTIL_ENDPOINT: ${{ inputs.endpoint }}
+        OSSUTIL_ACCESS_KEY_ID: ${{ inputs.access-key-id }}
+        OSSUTIL_ACCESS_KEY_SECRET: ${{ inputs.access-key-secret }}
+        OSSUTIL_STS_TOKEN: ${{ inputs.sts-token }}
+      run: |
+        set -euo pipefail
+
+        if [ "${RUNNER_OS}" != "Linux" ] || [ "${RUNNER_ARCH}" != "X64" ]; then
+          echo "This action supports Linux x64 runners only." >&2
+          exit 1
+        fi
+
+        : "${OSSUTIL_ENDPOINT:?endpoint is required}"
+        : "${OSSUTIL_ACCESS_KEY_ID:?access-key-id is required}"
+        : "${OSSUTIL_ACCESS_KEY_SECRET:?access-key-secret is required}"
+
+        echo "::add-mask::${OSSUTIL_ACCESS_KEY_ID}"
+        echo "::add-mask::${OSSUTIL_ACCESS_KEY_SECRET}"
+        if [ -n "${OSSUTIL_STS_TOKEN}" ]; then
+          echo "::add-mask::${OSSUTIL_STS_TOKEN}"
+        fi
+
+        ossutil_path="${GITHUB_ACTION_PATH}/bin/ossutil"
+        expected_sha="$(tr -d '[:space:]' < "${GITHUB_ACTION_PATH}/bin/ossutil.sha256")"
+        actual_sha="$(sha256sum "${ossutil_path}")"
+        actual_sha="${actual_sha%% *}"
+        if [ "${actual_sha}" != "${expected_sha}" ]; then
+          echo "ossutil checksum mismatch." >&2
+          exit 1
+        fi
+
+        chmod 755 "${ossutil_path}"
+        echo "${GITHUB_ACTION_PATH}/bin" >> "${GITHUB_PATH}"
+
+        umask 077
+        {
+          echo "[Credentials]"
+          echo "language = CH"
+          echo "endpoint = ${OSSUTIL_ENDPOINT}"
+          echo "accessKeyID = ${OSSUTIL_ACCESS_KEY_ID}"
+          echo "accessKeySecret = ${OSSUTIL_ACCESS_KEY_SECRET}"
+          echo "stsToken = ${OSSUTIL_STS_TOKEN}"
+        } > "${HOME}/.ossutilconfig"

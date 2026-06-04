@@ -1,0 +1,33 @@
+name: Smoke Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./
+        with:
+          endpoint: oss-cn-hangzhou.aliyuncs.com
+          access-key-id: test-access-key-id
+          access-key-secret: test-access-key-secret
+
+      - name: Verify setup
+        run: |
+          set -euo pipefail
+
+          command -v ossutil
+          ossutil --version
+
+          test -f "${HOME}/.ossutilconfig"
+          test "$(stat -c '%a' "${HOME}/.ossutilconfig")" = "600"
+          grep -q '^language = CH$' "${HOME}/.ossutilconfig"
+          grep -q '^endpoint = oss-cn-hangzhou.aliyuncs.com$' "${HOME}/.ossutilconfig"
+          grep -q '^accessKeyID = test-access-key-id$' "${HOME}/.ossutilconfig"
+          grep -q '^accessKeySecret = test-access-key-secret$' "${HOME}/.ossutilconfig"
+          grep -q '^stsToken = $' "${HOME}/.ossutilconfig"
